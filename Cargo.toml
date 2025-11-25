@@ -1,0 +1,23 @@
+[package]
+name = "krown-memory"
+version = "0.0.1"
+edition = "2025"
+
+[lib]
+name = "krown_memory"
+crate-type = ["staticlib", "cdylib"]
+
+[dependencies]
+libc = "0.2"
+
+[profile.release]
+opt-level = 3
+lto = "fat"
+codegen-units = 1
+strip = true
+panic = "abort"
+
+[profile.dev]
+opt-level = 1
+debug = true
+

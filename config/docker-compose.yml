@@ -1,0 +1,44 @@
+version: '3.8'
+
+services:
+  krown-agent:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: krown-agent
+    restart: always
+    privileged: true  # Nécessaire pour systemd dans Docker
+    volumes:
+      - /run/krown:/run/krown
+      - /tmp:/tmp
+      - krown-logs:/var/log/krown
+    environment:
+      - SOCKET_PATH=/run/krown/krown-agent.sock
+      - RUST_LOG=info
+    network_mode: host  # Pour accéder au socket depuis l'hôte
+    # Alternative: utiliser un réseau bridge et exposer le socket via volume
+    # networks:
+    #   - krown-network
+    labels:
+      - "com.krown.service=agent"
+      - "com.krown.version=1.0"
+    healthcheck:
+      test: ["CMD", "test", "-S", "/run/krown/krown-agent.sock"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  krown-logs:
+    driver: local
+
+# networks:
+#   krown-network:
+#     driver: bridge
+

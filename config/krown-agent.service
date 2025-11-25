@@ -1,0 +1,54 @@
+[Unit]
+Description=Krown SSH Agent
+Documentation=https://github.com/krown/agent
+After=network.target
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+# Utiliser un utilisateur dédié (recommandé pour la sécurité)
+User=krown
+Group=krown
+
+# Chemin du binaire
+ExecStart=/usr/local/bin/krown-agent /run/krown/krown-agent.sock
+
+# Répertoire de travail
+WorkingDirectory=/app
+
+# Variables d'environnement
+Environment="SOCKET_PATH=/run/krown/krown-agent.sock"
+Environment="RUST_LOG=info"
+
+# Politique de redémarrage automatique
+Restart=always
+RestartSec=5
+StartLimitInterval=0
+StartLimitBurst=5
+
+# Gestion des signaux
+KillMode=mixed
+KillSignal=SIGTERM
+TimeoutStopSec=30
+
+# Sécurité
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/run/krown /var/log/krown
+
+# Logs
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=krown-agent
+
+# Limites de ressources (optionnel)
+LimitNOFILE=65536
+MemoryMax=512M
+
+[Install]
+WantedBy=multi-user.target
+Alias=krown-agent.service
+
