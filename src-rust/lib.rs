@@ -1,11 +1,6 @@
-/**
- * Krown Memory Manager - Gestion mémoire sécurisée en Rust
- * 
- * Cette bibliothèque fournit une gestion mémoire sécurisée pour le code C
- * en utilisant les garanties de sécurité mémoire de Rust.
- */
+//! Krown Memory Manager - Gestion mémoire sécurisée en Rust
 
-use std::ffi::{CStr, CString};
+use std::ffi::CStr;
 use std::os::raw::{c_char, c_void};
 use std::ptr;
 use std::slice;
@@ -113,99 +108,47 @@ impl Drop for SafeBuffer {
     }
 }
 
-/// Structure pour gérer une chaîne C de manière sécurisée
-pub struct SafeCString {
-    inner: CString,
+
+fn allocate(size: usize) -> *mut c_void {
+    if size == 0 {
+        return ptr::null_mut();
+    }
+    let mut vec = Vec::<u8>::with_capacity(size);
+    let ptr = vec.as_mut_ptr();
+    std::mem::forget(vec);
+    ptr as *mut c_void
 }
 
-impl SafeCString {
-    /// Créer une SafeCString depuis une &str
-    pub fn new(s: &str) -> Result<Self, ()> {
-        match CString::new(s) {
-            Ok(cstr) => Ok(Self { inner: cstr }),
-            Err(_) => Err(()),
-        }
-    }
-
-    /// Obtenir un pointeur C
-    pub fn as_ptr(&self) -> *const c_char {
-        self.inner.as_ptr()
-    }
-
-    /// Consommer et obtenir le CString
-    pub fn into_c_string(self) -> CString {
-        self.inner
+unsafe fn deallocate(ptr: *mut c_void, size: usize) {
+    if !ptr.is_null() && size > 0 {
+        let _ = Vec::from_raw_parts(ptr as *mut u8, 0, size);
     }
 }
 
-/// Gestionnaire de mémoire global (optimisé)
-pub struct MemoryManager;
-
-impl MemoryManager {
-    /// Allouer de la mémoire de manière sécurisée (alignée)
-    #[inline]
-    pub fn allocate(size: usize) -> *mut c_void {
-        if size == 0 {
-            return ptr::null_mut();
-        }
-        let mut vec = Vec::<u8>::with_capacity(size);
-        let ptr = vec.as_mut_ptr();
-        std::mem::forget(vec);
-        ptr as *mut c_void
+unsafe fn reallocate(ptr: *mut c_void, old_size: usize, new_size: usize) -> *mut c_void {
+    if ptr.is_null() {
+        return allocate(new_size);
     }
-    
-    /// Allouer avec alignement spécifique
-    #[inline]
-    pub fn allocate_aligned(size: usize, align: usize) -> *mut c_void {
-        if size == 0 {
-            return ptr::null_mut();
-        }
-        // Utiliser Vec qui gère déjà l'alignement
-        let mut vec = Vec::<u8>::with_capacity(size);
-        let ptr = vec.as_mut_ptr();
-        std::mem::forget(vec);
-        ptr as *mut c_void
+    if new_size == 0 {
+        deallocate(ptr, old_size);
+        return ptr::null_mut();
     }
-
-    /// Libérer de la mémoire allouée
-    #[inline]
-    pub unsafe fn deallocate(ptr: *mut c_void, size: usize) {
-        if !ptr.is_null() && size > 0 {
-            let _ = Vec::from_raw_parts(ptr as *mut u8, 0, size);
-        }
+    let mut old_vec = Vec::from_raw_parts(ptr as *mut u8, 0, old_size);
+    if new_size > old_size {
+        old_vec.reserve_exact(new_size - old_size);
+    } else {
+        old_vec.shrink_to_fit();
     }
-
-    /// Réallouer de la mémoire (optimisé)
-    #[inline]
-    pub unsafe fn reallocate(ptr: *mut c_void, old_size: usize, new_size: usize) -> *mut c_void {
-        if ptr.is_null() {
-            return Self::allocate(new_size);
-        }
-        
-        if new_size == 0 {
-            Self::deallocate(ptr, old_size);
-            return ptr::null_mut();
-        }
-
-        let mut old_vec = Vec::from_raw_parts(ptr as *mut u8, 0, old_size);
-        if new_size > old_size {
-            old_vec.reserve_exact(new_size - old_size);
-        } else {
-            old_vec.shrink_to_fit();
-        }
-        let new_ptr = old_vec.as_mut_ptr();
-        let new_cap = old_vec.capacity();
-        std::mem::forget(old_vec);
-        
-        // Si la capacité a changé, réallouer
-        if new_cap < new_size {
-            let new_vec = Vec::<u8>::with_capacity(new_size);
-            let new_ptr2 = new_vec.as_mut_ptr();
-            std::mem::forget(new_vec);
-            new_ptr2 as *mut c_void
-        } else {
-            new_ptr as *mut c_void
-        }
+    let new_ptr = old_vec.as_mut_ptr();
+    let new_cap = old_vec.capacity();
+    std::mem::forget(old_vec);
+    if new_cap < new_size {
+        let new_vec = Vec::<u8>::with_capacity(new_size);
+        let new_ptr2 = new_vec.as_mut_ptr();
+        std::mem::forget(new_vec);
+        new_ptr2 as *mut c_void
+    } else {
+        new_ptr as *mut c_void
     }
 }
 
@@ -239,42 +182,7 @@ pub fn escape_json_string(input: &str) -> String {
     output
 }
 
-/// Échapper une chaîne JSON avec pré-allocation de taille connue
-#[inline]
-pub fn escape_json_string_with_capacity(input: &str, estimated_size: usize) -> String {
-    let mut output = String::with_capacity(estimated_size);
-    escape_json_string_into(input, &mut output);
-    output
-}
 
-/// Échapper dans un String existant (évite les allocations)
-#[inline]
-pub fn escape_json_string_into(input: &str, output: &mut String) {
-    for ch in input.chars() {
-        match ch {
-            '"' => output.push_str("\\\""),
-            '\\' => output.push_str("\\\\"),
-            '\n' => output.push_str("\\n"),
-            '\r' => output.push_str("\\r"),
-            '\t' => output.push_str("\\t"),
-            '\x08' => output.push_str("\\b"),
-            '\x0c' => output.push_str("\\f"),
-            c if c < ' ' => {
-                output.push_str(&format!("\\u{:04x}", c as u32));
-            }
-            _ => output.push(ch),
-        }
-    }
-}
-
-/// Copier des données de manière sécurisée
-pub unsafe fn safe_memcpy(dest: *mut u8, src: *const u8, n: usize) -> Result<(), ()> {
-    if dest.is_null() || src.is_null() {
-        return Err(());
-    }
-    ptr::copy_nonoverlapping(src, dest, n);
-    Ok(())
-}
 
 // ============================================================================
 // Interface FFI pour le code C
@@ -341,26 +249,23 @@ pub unsafe extern "C" fn rust_buffer_free(buffer_ptr: *mut c_void) {
     }
 }
 
-/// Allouer de la mémoire de manière sécurisée
 #[no_mangle]
 pub extern "C" fn rust_malloc(size: usize) -> *mut c_void {
-    MemoryManager::allocate(size)
+    allocate(size)
 }
 
-/// Libérer de la mémoire
 #[no_mangle]
 pub unsafe extern "C" fn rust_free(ptr: *mut c_void, size: usize) {
-    MemoryManager::deallocate(ptr, size);
+    deallocate(ptr, size);
 }
 
-/// Réallouer de la mémoire
 #[no_mangle]
 pub unsafe extern "C" fn rust_realloc(
     ptr: *mut c_void,
     old_size: usize,
     new_size: usize,
 ) -> *mut c_void {
-    MemoryManager::reallocate(ptr, old_size, new_size)
+    reallocate(ptr, old_size, new_size)
 }
 
 /// Échapper une chaîne pour JSON (optimisé)
@@ -404,56 +309,16 @@ pub unsafe extern "C" fn rust_escape_json(
     escaped_bytes.len() as i32
 }
 
-/// Créer une chaîne C sécurisée depuis une chaîne C (copie)
-#[no_mangle]
-pub unsafe extern "C" fn rust_cstring_new(s: *const c_char) -> *mut c_char {
-    if s.is_null() {
-        return ptr::null_mut();
-    }
-
-    let c_str = CStr::from_ptr(s);
-    match c_str.to_str() {
-        Ok(str_slice) => {
-            match CString::new(str_slice) {
-                Ok(new_cstr) => {
-                    let boxed = Box::new(new_cstr);
-                    boxed.into_raw() as *mut c_char
-                }
-                Err(_) => ptr::null_mut(),
-            }
-        }
-        Err(_) => {
-            // Si ce n'est pas UTF-8 valide, copier quand même les bytes
-            let bytes = c_str.to_bytes();
-            match CString::new(bytes) {
-                Ok(new_cstr) => {
-                    let boxed = Box::new(new_cstr);
-                    boxed.into_raw() as *mut c_char
-                }
-                Err(_) => ptr::null_mut(),
-            }
-        }
-    }
-}
-
-/// Libérer une chaîne C créée par Rust
-#[no_mangle]
-pub unsafe extern "C" fn rust_cstring_free(s: *mut c_char) {
-    if !s.is_null() {
-        let _ = CString::from_raw(s);
-    }
-}
-
-/// Copier de la mémoire de manière sécurisée
 #[no_mangle]
 pub unsafe extern "C" fn rust_memcpy(
     dest: *mut c_void,
     src: *const c_void,
     n: usize,
 ) -> i32 {
-    match safe_memcpy(dest as *mut u8, src as *const u8, n) {
-        Ok(()) => 0,
-        Err(()) => -1,
+    if dest.is_null() || src.is_null() {
+        return -1;
     }
+    ptr::copy_nonoverlapping(src as *const u8, dest as *mut u8, n);
+    0
 }
 

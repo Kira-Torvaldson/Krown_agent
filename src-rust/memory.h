@@ -96,20 +96,6 @@ void* rust_realloc(void* ptr, size_t old_size, size_t new_size);
 int rust_escape_json(const char* input, char* output, size_t output_size);
 
 /**
- * Créer une chaîne C sécurisée depuis une chaîne C
- * @param s Chaîne source (null-terminated)
- * @return Pointeur vers la nouvelle chaîne, ou NULL en cas d'erreur
- *         Doit être libéré avec rust_cstring_free
- */
-char* rust_cstring_new(const char* s);
-
-/**
- * Libérer une chaîne C créée par rust_cstring_new
- * @param s Pointeur vers la chaîne à libérer
- */
-void rust_cstring_free(char* s);
-
-/**
  * Copier de la mémoire de manière sécurisée
  * @param dest Destination
  * @param src Source

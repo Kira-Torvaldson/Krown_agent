@@ -1,6 +1,4 @@
-/**
- * Gestionnaire de requêtes client
- */
+// Gestionnaire de requêtes client
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -15,9 +13,6 @@
 #include "ssh_handler.h"
 #include "request_handler.h"
 
-/**
- * Traiter une requête client
- */
 void* handle_client_request(void *arg) {
     int client_fd = *(int *)arg;
     free(arg);

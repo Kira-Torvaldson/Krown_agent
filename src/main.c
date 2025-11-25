@@ -1,9 +1,4 @@
-/**
- * Krown Agent - Daemon C pour gestion SSH
- * 
- * Ce daemon écoute sur un socket Unix local et répond aux commandes
- * du backend Node.js pour gérer les connexions SSH.
- */
+// Krown Agent - Daemon SSH
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -24,13 +19,9 @@
 #include "socket_server.h"
 #include "request_handler.h"
 
-// Variables globales
 static volatile bool running = true;
 static int server_fd = -1;
 
-/**
- * Gestionnaire de signal pour arrêt propre
- */
 void signal_handler(int sig) {
     if (sig == SIGINT || sig == SIGTERM) {
         printf("\n[Agent] Signal de terminaison reçu, arrêt en cours...\n");
@@ -41,9 +32,6 @@ void signal_handler(int sig) {
     }
 }
 
-/**
- * Fonction principale
- */
 int main(int argc, char *argv[]) {
     printf("=== Krown Agent v1.0 ===\n");
     printf("[Agent] Démarrage du daemon SSH...\n");

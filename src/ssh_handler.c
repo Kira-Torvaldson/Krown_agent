@@ -17,10 +17,9 @@
 #include "ssh_handler.h"
 #include "agent.h"
 
-// Inclure les fonctions de gestion mémoire Rust
 #include "memory.h"
 
-// Macro pour simplifier la gestion des erreurs JSON
+// Macros JSON
 #define JSON_PARSE_OR_RETURN(json_str, root_var, error_msg) \
     do { \
         root_var = json_tokener_parse(json_str); \

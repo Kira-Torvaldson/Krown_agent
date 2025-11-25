@@ -1,6 +1,4 @@
-/**
- * Serveur Socket Unix - Communication locale avec Node.js
- */
+// Serveur Socket Unix
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -17,11 +15,7 @@
 #include "ssh_handler.h"
 
 #define MAX_CLIENTS 10
-#define BUFFER_SIZE 4096
 
-/**
- * Démarrer le serveur socket Unix
- */
 int socket_server_start(const char *socket_path) {
     int server_fd;
     struct sockaddr_un addr;
@@ -66,9 +60,6 @@ int socket_server_start(const char *socket_path) {
     return server_fd;
 }
 
-/**
- * Accepter une nouvelle connexion
- */
 int socket_server_accept(int server_fd) {
     struct sockaddr_un client_addr;
     socklen_t client_len = sizeof(client_addr);
@@ -87,9 +78,6 @@ int socket_server_accept(int server_fd) {
     return client_fd;
 }
 
-/**
- * Lire une commande depuis le client
- */
 int socket_read_command(int client_fd, command_t **cmd_out) {
     // Lire l'en-tête (version + type + longueur)
     uint32_t header[3];
@@ -155,9 +143,6 @@ int socket_read_command(int client_fd, command_t **cmd_out) {
     return 0;
 }
 
-/**
- * Envoyer une réponse au client
- */
 int socket_send_response(int client_fd, response_code_t code, const char *data) {
     uint32_t data_len = data ? strlen(data) : 0;
     
@@ -196,9 +181,6 @@ int socket_send_response(int client_fd, response_code_t code, const char *data) 
     return 0;
 }
 
-/**
- * Arrêter le serveur
- */
 void socket_server_stop(int server_fd, const char *socket_path) {
     if (server_fd >= 0) {
         close(server_fd);
