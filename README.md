@@ -21,11 +21,38 @@ make
 make install
 ```
 
-### Docker
+### Installation Automatique (Recommandé)
 
 ```bash
-# Démarrer avec docker-compose
-docker-compose up -d
+# Linux - Installation locale
+chmod +x scripts/install.sh
+./scripts/install.sh
+
+# Linux - Installation sur machine distante
+chmod +x scripts/deploy-remote.sh
+./scripts/deploy-remote.sh user@host
+
+# Windows (PowerShell)
+.\scripts\install.ps1
+```
+
+Le script installe automatiquement Docker si nécessaire, construit l'image et démarre le conteneur avec redémarrage automatique.
+
+**Le conteneur redémarre automatiquement au boot de la machine grâce à `--restart=always`.**
+
+Voir [docs/INSTALL.md](docs/INSTALL.md) pour plus de détails.
+
+### Docker Manuel
+
+```bash
+# Avec docker-compose
+docker-compose -f config/docker-compose.yml up -d
+
+# Ou avec docker run
+docker run -d --name krown-agent --restart=always \
+  -v /run/krown:/run/krown -v /tmp:/tmp \
+  -e SOCKET_PATH=/run/krown/krown-agent.sock \
+  krown-agent
 ```
 
 ## 📚 Documentation
@@ -45,12 +72,19 @@ La documentation inclut :
 agent/
 ├── src/              # Code source C
 ├── src-rust/         # Code source Rust
-├── docs/             # Documentation
-├── config/            # Configuration (systemd, docker-compose)
-├── scripts/          # Scripts utilitaires
-├── bin/              # Binaires (généré)
-├── build/            # Objets (généré)
-└── target/           # Rust artifacts (généré)
+├── docs/             # Documentation (DOCUMENTATION.md, INSTALL.md, CONTRIBUTING.md)
+├── config/           # Configuration (systemd, docker-compose)
+├── scripts/          # Scripts (installation, déploiement, démarrage)
+├── bin/              # Binaires compilés (généré)
+├── build/            # Fichiers objets (généré)
+├── target/           # Artifacts Rust (généré)
+│
+├── README.md         # Documentation principale
+├── Cargo.toml        # Configuration Rust
+├── Makefile          # Build system
+├── Dockerfile        # Image Docker
+├── .gitignore        # Fichiers ignorés par Git
+└── .dockerignore     # Fichiers ignorés par Docker
 ```
 
 ## 🏗️ Architecture

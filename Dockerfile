@@ -1,15 +1,13 @@
 # Dockerfile pour krown-agent (Daemon C + Rust)
 FROM debian:bookworm-slim
 
-# Installer les dépendances système
-RUN apt-get update && apt-get install -y \
+# Installer les dépendances système (optimisé)
+RUN apt-get update && apt-get install -y --no-install-recommends \
     libssh-dev \
     libjson-c-dev \
     build-essential \
     curl \
     ca-certificates \
-    systemd \
-    systemd-sysv \
     && rm -rf /var/lib/apt/lists/*
 
 # Installer Rust
@@ -62,40 +60,14 @@ RUN mkdir -p /var/log/krown && \
 RUN mkdir -p /run/krown && \
     chown krown:krown /run/krown
 
-# Copier et configurer le service systemd
-COPY config/krown-agent.service /etc/systemd/system/krown-agent.service
-RUN systemctl enable krown-agent.service && \
-    echo "✓ Service systemd configuré"
 
-# Copier et installer le script de démarrage
-COPY scripts/start-agent.sh /usr/local/bin/start-agent.sh
-RUN chmod +x /usr/local/bin/start-agent.sh
-
-# Script d'initialisation Docker
+# Script d'initialisation Docker (optimisé)
 RUN echo '#!/bin/bash' > /docker-entrypoint.sh && \
     echo 'set -e' >> /docker-entrypoint.sh && \
-    echo '' >> /docker-entrypoint.sh && \
-    echo 'echo "=== Krown Agent Daemon ==="' >> /docker-entrypoint.sh && \
-    echo 'echo "[Docker] Initialisation du conteneur..."' >> /docker-entrypoint.sh && \
-    echo '' >> /docker-entrypoint.sh && \
-    echo '# Créer le répertoire pour le socket' >> /docker-entrypoint.sh && \
-    echo 'mkdir -p /run/krown' >> /docker-entrypoint.sh && \
-    echo 'chmod 755 /run/krown' >> /docker-entrypoint.sh && \
-    echo '' >> /docker-entrypoint.sh && \
-    echo '# Démarrer systemd si disponible (mode privilégié)' >> /docker-entrypoint.sh && \
-    echo 'if [ -d /run/systemd/system ] && [ "$(id -u)" = "0" ]; then' >> /docker-entrypoint.sh && \
-    echo '    echo "[Docker] Démarrage de systemd..."' >> /docker-entrypoint.sh && \
-    echo '    # Initialiser systemd' >> /docker-entrypoint.sh && \
-    echo '    systemctl daemon-reload' >> /docker-entrypoint.sh && \
-    echo '    systemctl enable krown-agent.service' >> /docker-entrypoint.sh && \
-    echo '    systemctl start krown-agent.service' >> /docker-entrypoint.sh && \
-    echo '    # Garder le conteneur en vie' >> /docker-entrypoint.sh && \
-    echo '    exec /lib/systemd/systemd --system --unit=basic.target' >> /docker-entrypoint.sh && \
-    echo 'else' >> /docker-entrypoint.sh && \
-    echo '    echo "[Docker] Démarrage direct de l agent..."' >> /docker-entrypoint.sh && \
-    echo '    echo "[Agent] Socket: ${SOCKET_PATH:-/run/krown/krown-agent.sock}"' >> /docker-entrypoint.sh && \
-    echo '    exec /usr/local/bin/krown-agent "${SOCKET_PATH:-/run/krown/krown-agent.sock}"' >> /docker-entrypoint.sh && \
-    echo 'fi' >> /docker-entrypoint.sh && \
+    echo 'SOCKET="${SOCKET_PATH:-/run/krown/krown-agent.sock}"' >> /docker-entrypoint.sh && \
+    echo 'mkdir -p "$(dirname "$SOCKET")"' >> /docker-entrypoint.sh && \
+    echo 'chmod 755 "$(dirname "$SOCKET")"' >> /docker-entrypoint.sh && \
+    echo 'exec /usr/local/bin/krown-agent "$SOCKET"' >> /docker-entrypoint.sh && \
     chmod +x /docker-entrypoint.sh
 
 # Exposer le socket

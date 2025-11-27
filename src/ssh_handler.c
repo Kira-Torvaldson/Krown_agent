@@ -58,14 +58,10 @@ static pthread_mutex_t sessions_mutex = PTHREAD_MUTEX_INITIALIZER;
  * Initialiser le gestionnaire SSH
  */
 int ssh_handler_init(void) {
-    // Initialiser libssh
     ssh_init();
-    
-    // Initialiser le tableau de sessions
     memset(sessions, 0, sizeof(sessions));
     session_count = 0;
-
-    printf("[SSH] Gestionnaire initialisé\n");
+    DEBUG_PRINT("[SSH] Gestionnaire initialisé\n");
     return 0;
 }
 
@@ -85,9 +81,8 @@ void ssh_handler_cleanup(void) {
     
     session_count = 0;
     pthread_mutex_unlock(&sessions_mutex);
-    
     ssh_finalize();
-    printf("[SSH] Gestionnaire nettoyé\n");
+    DEBUG_PRINT("[SSH] Gestionnaire nettoyé\n");
 }
 
 /**
@@ -179,24 +174,12 @@ response_code_t handle_ssh_connect(const char *json_data, char **response) {
         return RESP_SSH_ERROR;
     }
 
-    // Authentification
-    printf("[SSH] Tentative d'authentification pour %s@%s:%d\n", username, host, port);
-    
-    // Obtenir les méthodes d'authentification disponibles AVANT d'essayer
     int auth_methods = ssh_userauth_list(session, username);
-    printf("[SSH] Méthodes d'authentification disponibles: ");
-    if (auth_methods & SSH_AUTH_METHOD_PUBLICKEY) printf("publickey ");
-    if (auth_methods & SSH_AUTH_METHOD_PASSWORD) printf("password ");
-    if (auth_methods & SSH_AUTH_METHOD_HOSTBASED) printf("hostbased ");
-    if (auth_methods & SSH_AUTH_METHOD_INTERACTIVE) printf("keyboard-interactive ");
-    printf("\n");
+    DEBUG_PRINT("[SSH] Authentification %s@%s:%d\n", username, host, port);
     
     if (password && strlen(password) > 0) {
-        printf("[SSH] Méthode: mot de passe (longueur: %zu)\n", strlen(password));
-        
-        // Vérifier que le serveur accepte l'authentification par mot de passe
         if (!(auth_methods & SSH_AUTH_METHOD_PASSWORD)) {
-            printf("[SSH] ERREUR: Le serveur n'accepte pas l'authentification par mot de passe\n");
+            DEBUG_PRINT("[SSH] ERREUR: Le serveur n'accepte pas l'authentification par mot de passe\n");
             char error_msg[256];
             snprintf(error_msg, sizeof(error_msg), 
                     "{\"error\":\"Le serveur SSH n'accepte pas l'authentification par mot de passe\"}");
@@ -238,11 +221,10 @@ response_code_t handle_ssh_connect(const char *json_data, char **response) {
             return RESP_SSH_ERROR;
         }
         
-        // Créer un fichier temporaire pour la clé privée
         char tmp_key_file[] = "/tmp/krown_ssh_key_XXXXXX";
         int tmp_fd = mkstemp(tmp_key_file);
         if (tmp_fd < 0) {
-            printf("[SSH] ERREUR: Impossible de créer un fichier temporaire pour la clé\n");
+            DEBUG_PRINT("[SSH] ERREUR: Impossible de créer un fichier temporaire pour la clé\n");
             char error_msg[256];
             snprintf(error_msg, sizeof(error_msg), 
                     "{\"error\":\"Impossible de créer un fichier temporaire pour la clé privée\"}");
@@ -258,7 +240,7 @@ response_code_t handle_ssh_connect(const char *json_data, char **response) {
         close(tmp_fd);
         
         if (written != (ssize_t)strlen(private_key)) {
-            printf("[SSH] ERREUR: Impossible d'écrire la clé privée dans le fichier temporaire\n");
+            DEBUG_PRINT("[SSH] ERREUR: Impossible d'écrire la clé privée\n");
             unlink(tmp_key_file);
             char error_msg[256];
             snprintf(error_msg, sizeof(error_msg), 
@@ -281,8 +263,7 @@ response_code_t handle_ssh_connect(const char *json_data, char **response) {
         unlink(tmp_key_file);
         
         if (import_rc != SSH_OK || privkey == NULL) {
-            printf("[SSH] ERREUR: Impossible d'importer la clé privée: %s\n", 
-                   import_rc == SSH_OK ? "clé NULL" : ssh_get_error(session));
+            DEBUG_PRINT("[SSH] ERREUR: Impossible d'importer la clé privée\n");
             char error_msg[512];
             snprintf(error_msg, sizeof(error_msg), 
                     "{\"error\":\"Impossible d'importer la clé privée: format invalide ou clé corrompue. Vérifiez le format de la clé (OpenSSH, PEM, etc.) et la passphrase si nécessaire.\"}");
@@ -357,39 +338,13 @@ response_code_t handle_ssh_connect(const char *json_data, char **response) {
 
     if (rc != SSH_AUTH_SUCCESS) {
         const char *error_str = ssh_get_error(session);
-        char error_msg[1024];
-        
-        // Obtenir plus de détails sur l'erreur
-        int auth_methods = ssh_userauth_list(session, username);
-        char methods_str[128] = "";
-        if (auth_methods & SSH_AUTH_METHOD_PUBLICKEY) strcat(methods_str, "publickey,");
-        if (auth_methods & SSH_AUTH_METHOD_PASSWORD) strcat(methods_str, "password,");
-        if (auth_methods & SSH_AUTH_METHOD_HOSTBASED) strcat(methods_str, "hostbased,");
-        if (auth_methods & SSH_AUTH_METHOD_INTERACTIVE) strcat(methods_str, "keyboard-interactive,");
-        
-        // Retirer la virgule finale
-        size_t len = strlen(methods_str);
-        if (len > 0 && methods_str[len-1] == ',') {
-            methods_str[len-1] = '\0';
-        }
-        
-        // Message d'erreur détaillé selon le type d'erreur
-        const char *error_detail = "";
-        if (rc == SSH_AUTH_DENIED) {
-            if (private_key && strlen(private_key) > 0) {
-                error_detail = " La clé publique n'est probablement pas dans ~/.ssh/authorized_keys sur le serveur. Vérifiez que la clé publique correspondante est bien ajoutée au fichier authorized_keys du serveur.";
-            } else {
-                error_detail = " Les identifiants sont incorrects ou l'utilisateur n'existe pas.";
-            }
-        } else if (rc == SSH_AUTH_PARTIAL) {
-            error_detail = " Authentification partielle - une méthode supplémentaire est requise.";
-        } else if (rc == SSH_AUTH_ERROR) {
-            error_detail = " Erreur lors de l'authentification - vérifiez les logs du serveur SSH.";
-        }
-        
+        char error_msg[512];
+        const char *error_detail = (rc == SSH_AUTH_DENIED) ? 
+            (private_key && strlen(private_key) > 0 ? " Clé publique non autorisée." : " Identifiants incorrects.") :
+            (rc == SSH_AUTH_PARTIAL ? " Authentification partielle." : " Erreur d'authentification.");
         snprintf(error_msg, sizeof(error_msg), 
-                "{\"error\":\"Échec authentification: %s%s\",\"auth_methods_available\":\"%s\",\"auth_code\":%d,\"hint\":\"Vérifiez les logs de l'agent pour plus de détails\"}", 
-                error_str, error_detail, methods_str, rc);
+                "{\"error\":\"Échec authentification: %s%s\",\"auth_code\":%d}", 
+                error_str, error_detail, rc);
         *response = strdup(error_msg);
         ssh_disconnect(session);
         ssh_free(session);
@@ -613,7 +568,6 @@ response_code_t handle_ssh_execute(const char *json_data, char **response) {
         }
     }
 
-    // Formater la réponse avec taille exacte
     size_t response_size = escaped_stdout_len + (escaped_stderr ? strlen(escaped_stderr) : 0) + 128;
     char *response_json = malloc(response_size);
     if (!response_json) {
@@ -636,7 +590,6 @@ response_code_t handle_ssh_execute(const char *json_data, char **response) {
                 escaped_stdout, exit_status, stdout_len);
     }
     
-    // Nettoyage
     free(escaped_stdout);
     if (escaped_stderr) free(escaped_stderr);
     rust_buffer_free(stdout_buffer);
@@ -684,8 +637,6 @@ response_code_t handle_ssh_status(const char *json_data, char **response) {
  */
 response_code_t handle_list_sessions(char **response) {
     pthread_mutex_lock(&sessions_mutex);
-    
-    // Utiliser un buffer Rust pour la construction JSON
     void *json_buffer = rust_buffer_new(256);
     if (!json_buffer) {
         pthread_mutex_unlock(&sessions_mutex);
@@ -693,23 +644,16 @@ response_code_t handle_list_sessions(char **response) {
         return RESP_ERROR;
     }
     
-    // Commencer le JSON
     rust_buffer_append(json_buffer, "{\"sessions\":[", 13);
-    
     int count = 0;
     for (int i = 0; i < session_count; i++) {
         if (sessions[i].connected) {
-            if (count > 0) {
-                rust_buffer_append(json_buffer, ",", 1);
-            }
-            
-            char session_json[256];
+            if (count > 0) rust_buffer_append(json_buffer, ",", 1);
+            char session_json[128];
             int n = snprintf(session_json, sizeof(session_json),
                     "{\"id\":\"%s\",\"status\":\"connected\",\"created_at\":%ld}",
                     sessions[i].session_id, sessions[i].created_at);
-            if (n > 0) {
-                rust_buffer_append(json_buffer, session_json, n);
-            }
+            if (n > 0) rust_buffer_append(json_buffer, session_json, n);
             count++;
         }
     }
@@ -718,10 +662,8 @@ response_code_t handle_list_sessions(char **response) {
     int count_len = snprintf(count_str, sizeof(count_str), "],\"count\":%d}", count);
     rust_buffer_append(json_buffer, count_str, count_len);
     
-    // Convertir le buffer en chaîne C
     size_t json_len = rust_buffer_len(json_buffer);
     const char *json_data = (const char*)rust_buffer_data(json_buffer);
-    
     char *json = malloc(json_len + 1);
     if (!json) {
         rust_buffer_free(json_buffer);

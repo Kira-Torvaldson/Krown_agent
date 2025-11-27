@@ -17,7 +17,7 @@ void* handle_client_request(void *arg) {
     int client_fd = *(int *)arg;
     free(arg);
 
-    printf("[Handler] Traitement de la requête (fd=%d)\n", client_fd);
+    DEBUG_PRINT("[Handler] Traitement de la requête (fd=%d)\n", client_fd);
 
     // Lire la commande
     command_t *cmd = NULL;
@@ -33,45 +33,35 @@ void* handle_client_request(void *arg) {
 
     switch (cmd->cmd_type) {
         case CMD_PING:
-            printf("[Handler] Commande: PING\n");
+            DEBUG_PRINT("[Handler] Commande: PING\n");
             response_data = strdup("{\"status\":\"pong\",\"agent\":\"krown-agent v1.0\"}");
-            if (!response_data) {
-                code = RESP_ERROR;
-            }
+            if (!response_data) code = RESP_ERROR;
             break;
-
         case CMD_SSH_CONNECT:
-            printf("[Handler] Commande: SSH_CONNECT\n");
+            DEBUG_PRINT("[Handler] Commande: SSH_CONNECT\n");
             code = handle_ssh_connect(cmd->data, &response_data);
             break;
-
         case CMD_SSH_DISCONNECT:
-            printf("[Handler] Commande: SSH_DISCONNECT\n");
+            DEBUG_PRINT("[Handler] Commande: SSH_DISCONNECT\n");
             code = handle_ssh_disconnect(cmd->data, &response_data);
             break;
-
         case CMD_SSH_EXECUTE:
-            printf("[Handler] Commande: SSH_EXECUTE\n");
+            DEBUG_PRINT("[Handler] Commande: SSH_EXECUTE\n");
             code = handle_ssh_execute(cmd->data, &response_data);
             break;
-
         case CMD_SSH_STATUS:
-            printf("[Handler] Commande: SSH_STATUS\n");
+            DEBUG_PRINT("[Handler] Commande: SSH_STATUS\n");
             code = handle_ssh_status(cmd->data, &response_data);
             break;
-
         case CMD_LIST_SESSIONS:
-            printf("[Handler] Commande: LIST_SESSIONS\n");
+            DEBUG_PRINT("[Handler] Commande: LIST_SESSIONS\n");
             code = handle_list_sessions(&response_data);
             break;
-
         default:
-            printf("[Handler] Commande inconnue: %u\n", cmd->cmd_type);
+            DEBUG_PRINT("[Handler] Commande inconnue: %u\n", cmd->cmd_type);
             code = RESP_INVALID_CMD;
             response_data = strdup("{\"error\":\"Commande inconnue\"}");
-            if (!response_data) {
-                code = RESP_ERROR;
-            }
+            if (!response_data) code = RESP_ERROR;
             break;
     }
 
@@ -83,10 +73,8 @@ void* handle_client_request(void *arg) {
         socket_send_response(client_fd, RESP_ERROR, "{\"error\":\"Erreur interne\"}");
     }
 
-    // Nettoyage
     free(cmd);
     close(client_fd);
-    printf("[Handler] Requête traitée (fd=%d)\n", client_fd);
-
+    DEBUG_PRINT("[Handler] Requête traitée (fd=%d)\n", client_fd);
     return NULL;
 }

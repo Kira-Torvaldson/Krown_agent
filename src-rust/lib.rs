@@ -40,72 +40,20 @@ impl SafeBuffer {
         self.data.extend_from_slice(data);
     }
 
-    /// Obtenir une référence vers les données
     #[inline]
     pub fn as_slice(&self) -> &[u8] {
         &self.data
     }
-    
-    /// Obtenir un pointeur mutable vers les données (pour écriture directe)
-    #[inline]
-    pub fn as_mut_ptr(&mut self) -> *mut u8 {
-        self.data.as_mut_ptr()
-    }
-    
-    /// Obtenir la capacité actuelle
-    #[inline]
-    pub fn capacity(&self) -> usize {
-        self.data.capacity()
-    }
 
-    /// Obtenir la longueur actuelle
     #[inline]
     pub fn len(&self) -> usize {
         self.data.len()
-    }
-
-    /// Vérifier si le buffer est vide
-    #[inline]
-    pub fn is_empty(&self) -> bool {
-        self.data.is_empty()
-    }
-
-    /// Vider le buffer (conserve la capacité)
-    #[inline]
-    pub fn clear(&mut self) {
-        self.data.clear();
-    }
-    
-    /// Réduire la capacité si possible
-    #[inline]
-    pub fn shrink_to_fit(&mut self) {
-        self.data.shrink_to_fit();
-    }
-
-    /// Consommer le buffer et retourner le Vec
-    #[inline]
-    pub fn into_vec(self) -> Vec<u8> {
-        self.data
-    }
-    
-    /// Consommer et obtenir un pointeur C (appelant doit libérer avec rust_free)
-    pub fn into_raw(self) -> (*mut u8, usize) {
-        let mut vec = self.data;
-        vec.shrink_to_fit();
-        let ptr = vec.as_mut_ptr();
-        let len = vec.len();
-        let cap = vec.capacity();
-        std::mem::forget(vec);
-        (ptr, cap)
     }
 }
 
 impl Drop for SafeBuffer {
     #[inline]
-    fn drop(&mut self) {
-        // La mémoire est automatiquement libérée par Rust
-        // Pas besoin de clear(), Vec le fait automatiquement
-    }
+    fn drop(&mut self) {}
 }
 
 

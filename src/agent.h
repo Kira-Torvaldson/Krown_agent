@@ -1,12 +1,16 @@
-/**
- * Krown Agent - En-têtes principaux
- */
+// Krown Agent - En-têtes principaux
 
 #ifndef KROWN_AGENT_H
 #define KROWN_AGENT_H
 
 #include <stdint.h>
 #include <stdbool.h>
+
+#ifdef NDEBUG
+#define DEBUG_PRINT(...) ((void)0)
+#else
+#define DEBUG_PRINT(...) printf(__VA_ARGS__)
+#endif
 
 // Version du protocole
 #define PROTOCOL_VERSION 1

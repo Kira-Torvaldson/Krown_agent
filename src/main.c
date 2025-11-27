@@ -24,40 +24,27 @@ static int server_fd = -1;
 
 void signal_handler(int sig) {
     if (sig == SIGINT || sig == SIGTERM) {
-        printf("\n[Agent] Signal de terminaison reçu, arrêt en cours...\n");
+        DEBUG_PRINT("\n[Agent] Signal de terminaison reçu\n");
         running = false;
-        if (server_fd >= 0) {
-            close(server_fd);
-        }
+        if (server_fd >= 0) close(server_fd);
     }
 }
 
 int main(int argc, char *argv[]) {
-    printf("=== Krown Agent v1.0 ===\n");
-    printf("[Agent] Démarrage du daemon SSH...\n");
-
-    // Enregistrer les gestionnaires de signaux
+    DEBUG_PRINT("=== Krown Agent v1.0 ===\n");
     signal(SIGINT, signal_handler);
     signal(SIGTERM, signal_handler);
 
-    // Initialiser le gestionnaire SSH
     if (ssh_handler_init() != 0) {
         fprintf(stderr, "[Agent] Erreur: Échec de l'initialisation SSH\n");
         return 1;
     }
-    printf("[Agent] Gestionnaire SSH initialisé\n");
 
-    // Démarrer le serveur socket Unix
-    // Utiliser la variable d'environnement ou l'argument, sinon défaut
     const char *socket_path = getenv("SOCKET_PATH");
-    if (!socket_path) {
-        socket_path = "/tmp/krown-agent.sock";
-    }
-    if (argc > 1) {
-        socket_path = argv[1];
-    }
+    if (!socket_path) socket_path = "/tmp/krown-agent.sock";
+    if (argc > 1) socket_path = argv[1];
 
-    printf("[Agent] Écoute sur socket: %s\n", socket_path);
+    DEBUG_PRINT("[Agent] Écoute sur socket: %s\n", socket_path);
     
     server_fd = socket_server_start(socket_path);
     if (server_fd < 0) {
@@ -66,7 +53,7 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    printf("[Agent] Daemon prêt, en attente de commandes...\n");
+    DEBUG_PRINT("[Agent] Daemon prêt\n");
 
     // Boucle principale avec select() pour éviter les appels accept() inutiles
     // Accepter plusieurs connexions par itération pour améliorer le débit
@@ -146,12 +133,9 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    // Nettoyage
-    printf("[Agent] Arrêt du daemon...\n");
+    DEBUG_PRINT("[Agent] Arrêt du daemon...\n");
     socket_server_stop(server_fd, socket_path);
     ssh_handler_cleanup();
-    printf("[Agent] Arrêt terminé\n");
-
     return 0;
 }
 

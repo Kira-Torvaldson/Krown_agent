@@ -12,7 +12,6 @@
 
 #include "socket_server.h"
 #include "agent.h"
-#include "ssh_handler.h"
 
 #define MAX_CLIENTS 10
 
@@ -53,10 +52,8 @@ int socket_server_start(const char *socket_path) {
         return -1;
     }
 
-    // Changer les permissions du socket
     chmod(socket_path, 0666);
-
-    printf("[Socket] Serveur démarré sur %s\n", socket_path);
+    DEBUG_PRINT("[Socket] Serveur démarré sur %s\n", socket_path);
     return server_fd;
 }
 
@@ -74,7 +71,7 @@ int socket_server_accept(int server_fd) {
         return -1;
     }
 
-    printf("[Socket] Nouvelle connexion acceptée (fd=%d)\n", client_fd);
+    DEBUG_PRINT("[Socket] Nouvelle connexion acceptée (fd=%d)\n", client_fd);
     return client_fd;
 }
 
@@ -182,10 +179,8 @@ int socket_send_response(int client_fd, response_code_t code, const char *data) 
 }
 
 void socket_server_stop(int server_fd, const char *socket_path) {
-    if (server_fd >= 0) {
-        close(server_fd);
-    }
+    if (server_fd >= 0) close(server_fd);
     unlink(socket_path);
-    printf("[Socket] Serveur arrêté\n");
+    DEBUG_PRINT("[Socket] Serveur arrêté\n");
 }
 
